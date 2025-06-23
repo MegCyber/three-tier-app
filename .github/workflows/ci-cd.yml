@@ -48,4 +48,40 @@ jobs:
       - name: Push Frontend Docker Image
         run: docker push ${{ secrets.DOCKER_USERNAME }}/three-tier-app-frontend:latest
 
-     
+      # --- Optional: Quality Gate Check (RECOMMENDED for CI) ---
+      # This step will fail the workflow if the Quality Gate fails on SonarCloud.
+      - name: Install jq
+        run: sudo apt-get update && sudo apt-get install -y jq
+
+      - name: Check SonarCloud Quality Gate Status
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
+        run: |
+          # Fetch the latest analysis ID for your project
+          # The 'component' parameter should be your overall SonarCloud project key
+          ANALYSIS_ID=$(curl -s -u "${{ secrets.SONAR_TOKEN }}:" "${{ secrets.SONAR_HOST_URL }}/api/ce/activity?component=MegCyber_three-tier-app" | jq -r '.tasks[0].id')
+          echo "SonarCloud Analysis ID: $ANALYSIS_ID"
+
+          if [ -z "$ANALYSIS_ID" ]; then
+            echo "Error: Could not retrieve analysis ID from SonarCloud. Check project key or token."
+            exit 1
+          fi
+
+          # Poll for Quality Gate status
+          STATUS="PENDING"
+          while [ "$STATUS" = "PENDING" ] || [ "$STATUS" = "IN_PROGRESS" ]; do
+            echo "Polling SonarCloud Quality Gate status... Current status: $STATUS"
+            sleep 10 # Wait 10 seconds before polling again
+            RESPONSE=$(curl -s -u "${{ secrets.SONAR_TOKEN }}:" "${{ secrets.SONAR_HOST_URL }}/api/qualitygates/project_status?analysisId=$ANALYSIS_ID")
+            STATUS=$(echo $RESPONSE | jq -r '.projectStatus.status')
+          done
+
+          echo "Final Quality Gate Status: $STATUS"
+
+          if [ "$STATUS" != "OK" ]; then
+            echo "Quality Gate failed! See SonarCloud for details."
+            exit 1
+          else
+            echo "Quality Gate passed."
+          fi

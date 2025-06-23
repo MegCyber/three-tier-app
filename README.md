@@ -1,11 +1,10 @@
 # Three Tier Application
-This application uses a Terraform to deploy a three tier application
+This application uses a github action to deploy a three tier application with docker
 
 This is an updated code from the original code: [AWS Three Tier Web Architecture Workshop](https://github.com/aws-samples/aws-three-tier-web-architecture-workshop/tree/main)
 
 ## Table of Contents
 - [Application code](#Application-code)
-- [Terraform](#Terraform)
 - [Getting Started](#getting-started)
 
 ## Application code
@@ -15,8 +14,7 @@ The `appliation-code` directory contains source codes for the `app-tier` and `we
 The `terraform` directory contains `infra` to create the resources with terraform and `s3-db` to create the remote backend
 
 ## Getting Started
-After a `terraform apply` on the `infra` directory, do these manual changes on the aws console. The instances will be accessed via ssm
-- On the web-tier instance, update `nginx.conf` with the internal loadbalancer dns.
+
 ``` 
  sudo -su ec2-user
  cd ~
