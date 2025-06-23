@@ -58,24 +58,40 @@ jobs:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           SONAR_HOST_URL: ${{ secrets.SONAR_HOST_URL }}
         run: |
-          # Fetch the latest analysis ID for your project
-          # The 'component' parameter should be your overall SonarCloud project key
-          ANALYSIS_ID=$(curl -s -u "${{ secrets.SONAR_TOKEN }}:" "${{ secrets.SONAR_HOST_URL }}/api/ce/activity?component=MegCyber_three-tier-app" | jq -r '.tasks[0].id')
-          echo "SonarCloud Analysis ID: $ANALYSIS_ID"
+          # Define project key and branch for direct Quality Gate query
+          PROJECT_KEY="MegCyber_three-tier-app" # Make sure this matches your project key
+          BRANCH_NAME="main" # Or your target branch name if different
 
-          if [ -z "$ANALYSIS_ID" ]; then
-            echo "Error: Could not retrieve analysis ID from SonarCloud. Check project key or token."
-            exit 1
-          fi
-
-          # Poll for Quality Gate status
+          # Poll for Quality Gate status by projectKey and branch
           STATUS="PENDING"
-          while [ "$STATUS" = "PENDING" ] || [ "$STATUS" = "IN_PROGRESS" ]; do
-            echo "Polling SonarCloud Quality Gate status... Current status: $STATUS"
+          MAX_RETRIES=20 # Set a maximum number of retries (e.g., 20 * 10s = 200s = 3 min 20 sec timeout)
+          RETRY_COUNT=0
+
+          while { [ "$STATUS" = "PENDING" ] || [ "$STATUS" = "IN_PROGRESS" ]; } && [ "$RETRY_COUNT" -lt "$MAX_RETRIES" ]; do
+            echo "Polling SonarCloud Quality Gate status for project $PROJECT_KEY on branch $BRANCH_NAME... Current status: $STATUS (Retry: $((RETRY_COUNT+1))/$MAX_RETRIES)"
             sleep 10 # Wait 10 seconds before polling again
-            RESPONSE=$(curl -s -u "${{ secrets.SONAR_TOKEN }}:" "${{ secrets.SONAR_HOST_URL }}/api/qualitygates/project_status?analysisId=$ANALYSIS_ID")
-            STATUS=$(echo $RESPONSE | jq -r '.projectStatus.status')
+
+            # Query using projectKey and branch directly
+            RESPONSE=$(curl -s -u "${{ secrets.SONAR_TOKEN }}:" "${{ secrets.SONAR_HOST_URL }}/api/qualitygates/project_status?projectKey=$PROJECT_KEY&branch=$BRANCH_NAME")
+            echo "SonarCloud API Response: $RESPONSE" # Print response for debugging
+
+            # Extract status. Use '|| echo ""' to prevent errors if jq path isn't found or JSON is invalid.
+            STATUS=$(echo "$RESPONSE" | jq -r '.projectStatus.status' || echo "") 
+
+            # If status is unexpectedly empty or null, treat it as pending for more retries (up to MAX_RETRIES)
+            if [ -z "$STATUS" ] && { [ "$STATUS" != "PENDING" ] && [ "$STATUS" != "IN_PROGRESS" ]; }; then
+                echo "Warning: Quality Gate status is empty/null, but not PENDING/IN_PROGRESS. Treating as PENDING for more retries."
+                STATUS="PENDING" 
+            fi
+
+            RETRY_COUNT=$((RETRY_COUNT+1))
           done
+
+          # Check if polling timed out
+          if [ "$RETRY_COUNT" -ge "$MAX_RETRIES" ] && { [ "$STATUS" = "PENDING" ] || [ "$STATUS" = "IN_PROGRESS" ]; }; then
+              echo "Error: Quality Gate check timed out after $((MAX_RETRIES * 10)) seconds. Analysis still PENDING/IN_PROGRESS."
+              exit 1
+          fi
 
           echo "Final Quality Gate Status: $STATUS"
 
