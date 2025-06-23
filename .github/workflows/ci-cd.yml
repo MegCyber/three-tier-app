@@ -50,7 +50,7 @@ jobs:
 
       # --- Optional: Quality Gate Check (RECOMMENDED for CI) ---
       - name: Wait for SonarCloud Quality Gate status
-        uses: SonarSource/sonarcloud-github-action/wait-quality-gate@master
+        uses: SonarSource/sonarcloud-github-action/wait-quality-gate@v2
         with:
-            projectKey: 'MegCyber_three-tier-app' # Use your overall Project Key
+            projectKey: 'MegCyber_three-tier-app' 
             token: ${{ secrets.SONAR_TOKEN }}
