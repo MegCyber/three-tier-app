@@ -14,7 +14,7 @@ The `appliation-code` directory contains source codes for the `app-tier` and `we
 The `terraform` directory contains `infra` to create the resources with terraform and `s3-db` to create the remote backend
 
 ## Getting Started
-
+  
 ``` 
  sudo -su ec2-user
  cd ~
