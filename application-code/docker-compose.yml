@@ -1,0 +1,43 @@
+version: '3.8'
+services:
+  web:
+    image: megops/three-tier-app-frontend:latest
+    container_name: web
+    ports:
+      - "3000:80" 
+    depends_on:
+      - app 
+    
+
+  app:
+    image: megops/three-tier-app-backend:latest
+    container_name: app
+    ports:
+      - "4000:4000" 
+    environment:
+      DB_HOST: db
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD} 
+      DB_NAME: ${DB_DATABASE}
+      command: bash -c "env | grep DB_PASSWORD; node index.js"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mysql:8.0 
+    command: --default-authentication-plugin=mysql_native_password 
+    environment:
+      MYSQL_ROOT_PASSWORD: ${DB_PASSWORD}  
+      MYSQL_DATABASE: ${DB_DATABASE}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD} 
+    ports:
+      - "3307:3306" 
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${DB_USER}", "-p${DB_PASSWORD}"] # Use the app's user/pass
+      #test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "${DB_USER}", "-p${DB_PASSWORD}"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 30s 
